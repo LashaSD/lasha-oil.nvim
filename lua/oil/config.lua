@@ -9,6 +9,7 @@ local default_config = {
     -- "permissions",
     -- "size",
     -- "mtime",
+    -- "git_status"
   },
   -- Buffer-local options to use for oil buffers
   buf_options = {
@@ -119,6 +120,14 @@ local default_config = {
     rm = function(path)
       return false
     end,
+  },
+  -- Configuration for git status in the columns
+  -- Format: {Symbol, Highlight}
+  git_column = {
+    modified = {"~", "@character.special"},
+    staged = {"+", "@diff.plus"},
+    untracked = {"?", "@comment.warning"},
+    none = {"-", "@comment"}
   },
   -- Configuration for the floating window in oil.open_float
   float = {
