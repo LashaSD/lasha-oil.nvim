@@ -284,6 +284,64 @@ local function pad_number(int)
   return string.format("%012d", int)
 end
 
+local function get_git_files()
+    local status_output = vim.fn.system("git status --porcelain")
+
+    local status_lines = vim.split(status_output, "\n")
+
+    local files = {
+        modified = {},
+        staged = {},
+        untracked = {},
+    }
+
+    for _, line in ipairs(status_lines) do
+        if line ~= "" then
+            local filename = line:sub(4)
+            local state = line:sub(1, 2)
+
+            if state:match("^.(M)") then
+                table.insert(files.modified, filename);
+            elseif state:match("^M") then
+                table.insert(files.staged, filename);
+            elseif state:match("^??") then
+                table.insert(files.untracked, filename);
+            end
+        end
+    end
+
+    return files
+end
+
+local function escape_pattern(s)
+    return s:gsub("([%.%-%+%*%?%[%]%(%)%$%^%{%}])", "%%%1")
+end
+
+M.register("git_status", {
+    render = function(entry, conf)
+        local git_files = get_git_files();
+        local name = entry[FIELD_NAME]
+
+        local function pred(v)
+            return v:match(escape_pattern(name)) ~= nil;
+        end
+
+        if vim.tbl_contains(git_files.modified, pred, { predicate = true }) then
+            return config.git_column.modified
+        elseif vim.tbl_contains(git_files.staged, pred, { predicate = true }) then
+            return config.git_column.staged
+        elseif vim.tbl_contains(git_files.untracked, pred, { predicate = true }) then
+            return config.git_column.untracked
+        end
+
+        return config.git_column.none
+    end,
+
+    parse = function(line, conf)
+        return line:match("^(%S+)%s+(.*)$")
+    end,
+});
+
 M.register("name", {
   render = function(entry, conf)
     error("Do not use the name column. It is for sorting only")
