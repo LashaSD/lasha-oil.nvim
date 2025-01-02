@@ -317,13 +317,20 @@ local function escape_pattern(s)
     return s:gsub("([%.%-%+%*%?%[%]%(%)%$%^%{%}])", "%%%1")
 end
 
+local function trim(s)
+    return (s:gsub("^%s*(.-)%s*$", "%1"))
+end
+
 M.register("git_status", {
     render = function(entry, conf)
-        local git_files = get_git_files();
-        local name = entry[FIELD_NAME]
+        local git_files = get_git_files()
+        local name = trim(entry[FIELD_NAME])
+        local dir = trim(vim.fn.expand('%'))..name
+        local pwd = escape_pattern(trim(vim.fn.system('echo $PWD')))
+        dir = dir:gsub("oil://"..pwd.."/", '');
 
         local function pred(v)
-            return v:match(escape_pattern(name)) ~= nil;
+            return v:match(escape_pattern(dir)) ~= nil;
         end
 
         if vim.tbl_contains(git_files.modified, pred, { predicate = true }) then
