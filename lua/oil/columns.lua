@@ -325,12 +325,16 @@ M.register("git_status", {
     render = function(entry, conf)
         local git_files = get_git_files()
         local name = trim(entry[FIELD_NAME])
-        local dir = trim(vim.fn.expand('%'))..name
+        local filedir = trim(vim.fn.expand('%'))..name
         local pwd = escape_pattern(trim(vim.fn.system('echo $PWD')))
-        dir = dir:gsub("oil://"..pwd.."/", '');
+        filedir = filedir:gsub("oil://"..pwd.."/", '');
+
+        if is_entry_directory(entry) then
+            filedir = filedir .. '/';
+        end
 
         local function pred(v)
-            return v:match(escape_pattern(dir)) ~= nil;
+            return trim(v):match(escape_pattern(trim(filedir))) ~= nil or trim(v) == trim(filedir);
         end
 
         if vim.tbl_contains(git_files.modified, pred, { predicate = true }) then
