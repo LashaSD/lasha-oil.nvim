@@ -1,4 +1,5 @@
-# oil.nvim
+# oil.nvim (fork)
+> A fork of [oil.nvim](https://github.com/stevearc/oil.nvim) with additional support for Git signs in the columns.
 
 A [vim-vinegar](https://github.com/tpope/vim-vinegar) like file explorer that lets you edit your filesystem like a normal Neovim buffer.
 
@@ -129,6 +130,7 @@ You can open a directory with `:edit <path>` or `:Oil <path>`. To open oil in a 
 
 ## Options
 
+
 ```lua
 require("oil").setup({
   -- Oil will take over directory buffers (e.g. `vim .` or `:e src/`)
@@ -141,6 +143,7 @@ require("oil").setup({
     -- "permissions",
     -- "size",
     -- "mtime",
+    -- "git_status",
   },
   -- Buffer-local options to use for oil buffers
   buf_options = {
@@ -252,6 +255,14 @@ require("oil").setup({
       return false
     end,
   },
+  -- Configuration for git status in the columns
+  -- Format: {Symbol, Highlight}
+  git_column = {
+    modified = {"~", "@character.special"},
+    staged = {"+", "@diff.plus"},
+    untracked = {"?", "@comment.warning"},
+    none = {"-", "@comment"}
+  },
   -- Configuration for the floating window in oil.open_float
   float = {
     -- Padding around the floating window
@@ -330,6 +341,29 @@ require("oil").setup({
   keymaps_help = {
     border = "rounded",
   },
+})
+```
+
+## Options added by the Fork
+
+```lua
+require("oil").setup({
+  ...
+  columns = {
+    ...
+    "git_status",
+    ...
+  },
+  ...
+  -- Configuration for git status in the columns
+  -- Format: {Symbol, Highlight}
+  git_column = {
+    modified = {"~", "@character.special"},
+    staged = {"+", "@diff.plus"},
+    untracked = {"?", "@comment.warning"},
+    none = {"-", "@comment"}
+  },
+  ...
 })
 ```
 
