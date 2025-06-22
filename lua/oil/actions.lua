@@ -229,13 +229,24 @@ M.open_terminal = {
       assert(dir, "Oil buffer with files adapter must have current directory")
       local bufnr = vim.api.nvim_create_buf(false, true)
       vim.api.nvim_set_current_buf(bufnr)
-      vim.fn.termopen(vim.o.shell, { cwd = dir })
+      if vim.fn.has("nvim-0.11") == 1 then
+        vim.fn.jobstart(vim.o.shell, { cwd = dir, term = true })
+      else
+        ---@diagnostic disable-next-line: deprecated
+        vim.fn.termopen(vim.o.shell, { cwd = dir })
+      end
     elseif adapter.name == "ssh" then
       local bufnr = vim.api.nvim_create_buf(false, true)
       vim.api.nvim_set_current_buf(bufnr)
       local url = require("oil.adapters.ssh").parse_url(bufname)
       local cmd = require("oil.adapters.ssh.connection").create_ssh_command(url)
-      local term_id = vim.fn.termopen(cmd)
+      local term_id
+      if vim.fn.has("nvim-0.11") == 1 then
+        term_id = vim.fn.jobstart(cmd, { term = true })
+      else
+        ---@diagnostic disable-next-line: deprecated
+        term_id = vim.fn.termopen(cmd)
+      end
       if term_id then
         vim.api.nvim_chan_send(term_id, string.format("cd %s\n", url.path))
       end
@@ -418,6 +429,20 @@ M.copy_entry_filename = {
   end,
 }
 
+M.copy_to_system_clipboard = {
+  desc = "Copy the entry under the cursor to the system clipboard",
+  callback = function()
+    require("oil.clipboard").copy_to_system_clipboard()
+  end,
+}
+
+M.paste_from_system_clipboard = {
+  desc = "Paste the system clipboard into the current oil directory",
+  callback = function()
+    require("oil.clipboard").paste_from_system_clipboard()
+  end,
+}
+
 M.open_cmdline_dir = {
   desc = "Open vim cmdline with current directory as an argument",
   deprecated = true,
@@ -504,10 +529,12 @@ M.send_to_qflist = {
     opts = vim.tbl_deep_extend("keep", opts or {}, {
       target = "qflist",
       action = "r",
+      only_matching_search = false,
     })
     util.send_to_quickfix({
       target = opts.target,
       action = opts.action,
+      only_matching_search = opts.only_matching_search,
     })
   end,
   parameters = {
@@ -518,6 +545,10 @@ M.send_to_qflist = {
     action = {
       type = '"r"|"a"',
       desc = "Replace or add to current quickfix list (see |setqflist-action|)",
+    },
+    only_matching_search = {
+      type = "boolean",
+      desc = "Whether to only add the files that matches the last search. This option only applies when search highlighting is active",
     },
   },
 }

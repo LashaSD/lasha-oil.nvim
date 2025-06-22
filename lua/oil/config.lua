@@ -133,6 +133,7 @@ local default_config = {
   float = {
     -- Padding around the floating window
     padding = 2,
+    -- max_width and max_height can be integers or a float between 0 and 1 (e.g. 0.4 for 40%)
     max_width = 0,
     max_height = 0,
     border = "rounded",
@@ -295,7 +296,7 @@ local M = {}
 ---@field natural_order boolean|"fast"
 ---@field case_insensitive boolean
 ---@field sort oil.SortSpec[]
----@field highlight_filename? fun(entry: oil.Entry, is_hidden: boolean, is_link_target: boolean, is_link_orphan: boolean): string|nil
+---@field highlight_filename? fun(entry: oil.Entry, is_hidden: boolean, is_link_target: boolean, is_link_orphan: boolean, bufnr: integer): string|nil
 
 ---@class (exact) oil.SetupViewOptions
 ---@field show_hidden? boolean Show files and directories that start with "."
@@ -402,6 +403,13 @@ local M = {}
 M.setup = function(opts)
   opts = opts or {}
 
+  if opts.trash_command then
+    vim.notify(
+      "[oil.nvim] trash_command is deprecated. Use built-in trash functionality instead (:help oil-trash).\nCompatibility will be removed on 2025-06-01.",
+      vim.log.levels.WARN
+    )
+  end
+
   local new_conf = vim.tbl_deep_extend("keep", opts, default_config)
   if not new_conf.use_default_keymaps then
     new_conf.keymaps = opts.keymaps or {}
@@ -465,10 +473,6 @@ M.get_adapter_by_scheme = function(scheme)
   if adapter == nil then
     local name = M.adapters[scheme]
     if not name then
-      vim.notify(
-        string.format("Could not find oil adapter for scheme '%s'", scheme),
-        vim.log.levels.ERROR
-      )
       return nil
     end
     local ok
@@ -479,7 +483,6 @@ M.get_adapter_by_scheme = function(scheme)
     else
       M._adapter_by_scheme[scheme] = false
       adapter = false
-      vim.notify(string.format("Could not find oil adapter '%s'", name), vim.log.levels.ERROR)
     end
   end
   if adapter then

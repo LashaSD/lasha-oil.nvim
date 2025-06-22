@@ -126,7 +126,7 @@ ssh_columns.permissions = {
 
   compare = function(entry, parsed_value)
     local meta = entry[FIELD_META]
-    if parsed_value and meta.mode then
+    if parsed_value and meta and meta.mode then
       local mask = bit.lshift(1, 12) - 1
       local old_mode = bit.band(meta.mode, mask)
       if parsed_value ~= old_mode then
@@ -169,7 +169,7 @@ ssh_columns.size = {
 
   get_sort_value = function(entry)
     local meta = entry[FIELD_META]
-    if meta.size then
+    if meta and meta.size then
       return meta.size
     else
       return 0
@@ -303,8 +303,8 @@ M.perform_action = function(action, cb)
     local conn = get_connection(action.url)
     conn:rm(res.path, cb)
   elseif action.type == "move" then
-    local src_adapter = config.get_adapter_by_scheme(action.src_url)
-    local dest_adapter = config.get_adapter_by_scheme(action.dest_url)
+    local src_adapter = assert(config.get_adapter_by_scheme(action.src_url))
+    local dest_adapter = assert(config.get_adapter_by_scheme(action.dest_url))
     if src_adapter == M and dest_adapter == M then
       local src_res = M.parse_url(action.src_url)
       local dest_res = M.parse_url(action.dest_url)
@@ -324,8 +324,8 @@ M.perform_action = function(action, cb)
       cb("We should never attempt to move across adapters")
     end
   elseif action.type == "copy" then
-    local src_adapter = config.get_adapter_by_scheme(action.src_url)
-    local dest_adapter = config.get_adapter_by_scheme(action.dest_url)
+    local src_adapter = assert(config.get_adapter_by_scheme(action.src_url))
+    local dest_adapter = assert(config.get_adapter_by_scheme(action.dest_url))
     if src_adapter == M and dest_adapter == M then
       local src_res = M.parse_url(action.src_url)
       local dest_res = M.parse_url(action.dest_url)

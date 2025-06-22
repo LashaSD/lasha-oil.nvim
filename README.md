@@ -13,6 +13,7 @@ https://user-images.githubusercontent.com/506791/209727111-6b4a11f4-634a-4efa-94
 - [Options](#options)
 - [Adapters](#adapters)
 - [Recipes](#recipes)
+- [Third-party extensions](#third-party-extensions)
 - [API](#api)
 - [FAQ](#faq)
 
@@ -40,7 +41,9 @@ oil.nvim supports all the usual plugin managers
   opts = {},
   -- Optional dependencies
   dependencies = { { "echasnovski/mini.icons", opts = {} } },
-  -- dependencies = { "nvim-tree/nvim-web-devicons" }, -- use if prefer nvim-web-devicons
+  -- dependencies = { "nvim-tree/nvim-web-devicons" }, -- use if you prefer nvim-web-devicons
+  -- Lazy loading is not recommended because it is very tricky to make it work correctly in all situations.
+  lazy = false,
 }
 ```
 
@@ -267,6 +270,7 @@ require("oil").setup({
   float = {
     -- Padding around the floating window
     padding = 2,
+    -- max_width and max_height can be integers or a float between 0 and 1 (e.g. 0.4 for 40%)
     max_width = 0,
     max_height = 0,
     border = "rounded",
@@ -391,6 +395,13 @@ Note that at the moment the ssh adapter does not support Windows machines, and i
 - [Show CWD in the winbar](doc/recipes.md#show-cwd-in-the-winbar)
 - [Hide gitignored files and show git tracked hidden files](doc/recipes.md#hide-gitignored-files-and-show-git-tracked-hidden-files)
 
+## Third-party extensions
+
+These are plugins maintained by other authors that extend the functionality of oil.nvim.
+
+- [oil-git-status.nvim](https://github.com/refractalize/oil-git-status.nvim) - Shows git status of files in statuscolumn
+- [oil-lsp-diagnostics.nvim](https://github.com/JezerM/oil-lsp-diagnostics.nvim) - Shows LSP diagnostics indicator as virtual text
+
 ## API
 
 <!-- API -->
@@ -403,9 +414,9 @@ Note that at the moment the ssh adapter does not support Windows machines, and i
 - [set_is_hidden_file(is_hidden_file)](doc/api.md#set_is_hidden_fileis_hidden_file)
 - [toggle_hidden()](doc/api.md#toggle_hidden)
 - [get_current_dir(bufnr)](doc/api.md#get_current_dirbufnr)
-- [open_float(dir)](doc/api.md#open_floatdir)
+- [open_float(dir, opts, cb)](doc/api.md#open_floatdir-opts-cb)
 - [toggle_float(dir)](doc/api.md#toggle_floatdir)
-- [open(dir)](doc/api.md#opendir)
+- [open(dir, opts, cb)](doc/api.md#opendir-opts-cb)
 - [close(opts)](doc/api.md#closeopts)
 - [open_preview(opts, callback)](doc/api.md#open_previewopts-callback)
 - [select(opts, callback)](doc/api.md#selectopts-callback)

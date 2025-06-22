@@ -146,7 +146,7 @@ M.unlock_buffers = function()
   buffers_locked = false
   for bufnr in pairs(session) do
     if vim.api.nvim_buf_is_loaded(bufnr) then
-      local adapter = util.get_adapter(bufnr)
+      local adapter = util.get_adapter(bufnr, true)
       if adapter then
         vim.bo[bufnr].modifiable = adapter.is_modifiable(bufnr)
       end
@@ -258,31 +258,34 @@ local function get_first_mutable_column_col(adapter, ranges)
 end
 
 ---Force cursor to be after hidden/immutable columns
-local function constrain_cursor()
-  if not config.constrain_cursor then
+---@param bufnr integer
+---@param mode false|"name"|"editable"
+local function constrain_cursor(bufnr, mode)
+  if not mode then
+    return
+  end
+  if bufnr ~= vim.api.nvim_get_current_buf() then
     return
   end
   local parser = require("oil.mutator.parser")
 
-  local adapter = util.get_adapter(0)
+  local adapter = util.get_adapter(bufnr, true)
   if not adapter then
     return
   end
 
   local cur = vim.api.nvim_win_get_cursor(0)
-  local line = vim.api.nvim_buf_get_lines(0, cur[1] - 1, cur[1], true)[1]
+  local line = vim.api.nvim_buf_get_lines(bufnr, cur[1] - 1, cur[1], true)[1]
   local column_defs = columns.get_supported_columns(adapter)
   local result = parser.parse_line(adapter, line, column_defs)
   if result and result.ranges then
     local min_col
-    if config.constrain_cursor == "editable" then
+    if mode == "editable" then
       min_col = get_first_mutable_column_col(adapter, result.ranges)
-    elseif config.constrain_cursor == "name" then
+    elseif mode == "name" then
       min_col = result.ranges.name[1]
     else
-      error(
-        string.format('Unexpected value "%s" for option constrain_cursor', config.constrain_cursor)
-      )
+      error(string.format('Unexpected value "%s" for option constrain_cursor', mode))
     end
     if cur[2] < min_col then
       vim.api.nvim_win_set_cursor(0, { cur[1], min_col })
@@ -297,7 +300,7 @@ local function redraw_trash_virtual_text(bufnr)
     return
   end
   local parser = require("oil.mutator.parser")
-  local adapter = util.get_adapter(bufnr)
+  local adapter = util.get_adapter(bufnr, true)
   if not adapter or adapter.name ~= "trash" then
     return
   end
@@ -407,7 +410,7 @@ M.initialize = function(bufnr)
     callback = function()
       -- For some reason the cursor bounces back to its original position,
       -- so we have to defer the call
-      vim.schedule(constrain_cursor)
+      vim.schedule_wrap(constrain_cursor)(bufnr, config.constrain_cursor)
     end,
   })
   vim.api.nvim_create_autocmd({ "CursorMoved", "ModeChanged" }, {
@@ -420,7 +423,7 @@ M.initialize = function(bufnr)
         return
       end
 
-      constrain_cursor()
+      constrain_cursor(bufnr, config.constrain_cursor)
 
       if config.preview_win.update_on_cursor_moved then
         -- Debounce and update the preview window
@@ -457,7 +460,7 @@ M.initialize = function(bufnr)
     end,
   })
 
-  local adapter = util.get_adapter(bufnr)
+  local adapter = util.get_adapter(bufnr, true)
 
   -- Set up a watcher that will refresh the directory
   if
@@ -617,7 +620,7 @@ local function render_buffer(bufnr, opts)
     jump_first = false,
   })
   local scheme = util.parse_url(bufname)
-  local adapter = util.get_adapter(bufnr)
+  local adapter = util.get_adapter(bufnr, true)
   if not scheme or not adapter then
     return false
   end
@@ -644,14 +647,14 @@ local function render_buffer(bufnr, opts)
 
   if M.should_display("..", bufnr) then
     local cols =
-      M.format_entry_cols({ 0, "..", "directory" }, column_defs, col_width, adapter, true)
+      M.format_entry_cols({ 0, "..", "directory" }, column_defs, col_width, adapter, true, bufnr)
     table.insert(line_table, cols)
   end
 
   for _, entry in ipairs(entry_list) do
     local should_display, is_hidden = M.should_display(entry[FIELD_NAME], bufnr)
     if should_display then
-      local cols = M.format_entry_cols(entry, column_defs, col_width, adapter, is_hidden)
+      local cols = M.format_entry_cols(entry, column_defs, col_width, adapter, is_hidden, bufnr)
       table.insert(line_table, cols)
 
       local name = entry[FIELD_NAME]
@@ -675,19 +678,23 @@ local function render_buffer(bufnr, opts)
     vim.schedule(function()
       for _, winid in ipairs(vim.api.nvim_list_wins()) do
         if vim.api.nvim_win_is_valid(winid) and vim.api.nvim_win_get_buf(winid) == bufnr then
-          -- If we're not jumping to a specific lnum, use the current lnum so we can adjust the col
-          local lnum = jump_idx or vim.api.nvim_win_get_cursor(winid)[1]
-          local line = vim.api.nvim_buf_get_lines(bufnr, lnum - 1, lnum, true)[1]
-          local id_str = line:match("^/(%d+)")
-          local id = tonumber(id_str)
-          if id then
-            local entry = cache.get_entry_by_id(id)
-            if entry then
-              local name = entry[FIELD_NAME]
-              local col = line:find(name, 1, true) or (id_str:len() + 1)
-              vim.api.nvim_win_set_cursor(winid, { lnum, col - 1 })
+          if jump_idx then
+            local lnum = jump_idx
+            local line = vim.api.nvim_buf_get_lines(bufnr, lnum - 1, lnum, true)[1]
+            local id_str = line:match("^/(%d+)")
+            local id = tonumber(id_str)
+            if id then
+              local entry = cache.get_entry_by_id(id)
+              if entry then
+                local name = entry[FIELD_NAME]
+                local col = line:find(name, 1, true) or (id_str:len() + 1)
+                vim.api.nvim_win_set_cursor(winid, { lnum, col - 1 })
+                return
+              end
             end
           end
+
+          constrain_cursor(bufnr, "name")
         end
       end
     end)
@@ -723,8 +730,9 @@ end
 ---@param col_width integer[]
 ---@param adapter oil.Adapter
 ---@param is_hidden boolean
+---@param bufnr integer
 ---@return oil.TextChunk[]
-M.format_entry_cols = function(entry, column_defs, col_width, adapter, is_hidden)
+M.format_entry_cols = function(entry, column_defs, col_width, adapter, is_hidden, bufnr)
   local name = entry[FIELD_NAME]
   local meta = entry[FIELD_META]
   local hl_suffix = ""
@@ -743,7 +751,7 @@ M.format_entry_cols = function(entry, column_defs, col_width, adapter, is_hidden
   table.insert(cols, id_key)
   -- Then add all the configured columns
   for i, column in ipairs(column_defs) do
-    local chunk = columns.render_col(adapter, column, entry)
+    local chunk = columns.render_col(adapter, column, entry, bufnr)
     local text = type(chunk) == "table" and chunk[1] or chunk
     ---@cast text string
     col_width[i + 1] = math.max(col_width[i + 1], vim.api.nvim_strwidth(text))
@@ -760,16 +768,20 @@ M.format_entry_cols = function(entry, column_defs, col_width, adapter, is_hidden
     if entry_type == "link" then
       link_name, link_target = get_link_text(name, meta)
       local is_orphan = not (meta and meta.link_stat)
-      link_name_hl = get_custom_hl(external_entry, is_hidden, false, is_orphan)
+      link_name_hl = get_custom_hl(external_entry, is_hidden, false, is_orphan, bufnr)
 
       if link_target then
-        link_target_hl = get_custom_hl(external_entry, is_hidden, true, is_orphan)
+        link_target_hl = get_custom_hl(external_entry, is_hidden, true, is_orphan, bufnr)
       end
 
       -- intentional fallthrough
     else
-      local hl = get_custom_hl(external_entry, is_hidden, false, false)
+      local hl = get_custom_hl(external_entry, is_hidden, false, false, bufnr)
       if hl then
+        -- Add the trailing / if this is a directory, this is important
+        if entry_type == "directory" then
+          name = name .. "/"
+        end
         table.insert(cols, { name, hl })
         return cols
       end
@@ -869,7 +881,7 @@ M.render_buffer_async = function(bufnr, opts, callback)
     handle_error(string.format("Could not parse oil url '%s'", bufname))
     return
   end
-  local adapter = util.get_adapter(bufnr)
+  local adapter = util.get_adapter(bufnr, true)
   if not adapter then
     handle_error(string.format("[oil] no adapter for buffer '%s'", bufname))
     return
